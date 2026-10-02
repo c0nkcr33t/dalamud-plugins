@@ -1,0 +1,33 @@
+name: Refresh plugin catalog
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
+  push:
+    branches: [main]
+    paths: ['sources.json', 'scripts/**', 'tests/**', '.github/workflows/catalog.yml']
+permissions:
+  contents: write
+concurrency:
+  group: plugin-catalog
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests
+      - run: python scripts/update_catalog.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Commit changed catalog
+        run: |
+          if git diff --quiet -- pluginmaster.json; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add pluginmaster.json
+          git commit -m 'Update plugin catalog from published releases'
+          git push origin HEAD:main
